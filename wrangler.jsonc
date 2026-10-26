@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "news-app-backend",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "b5437d7fd18af6ed5e511022242b9efa",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  // 7 AM US Eastern: 11:00 UTC (daylight time) and 12:00 UTC (standard time).
+  // The scheduled handler only runs the one that is 7 AM in New York.
+  "triggers": { "crons": ["0 11 * * *", "0 12 * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "news-db",
+      "database_id": "71c86b88-2a20-46a1-af76-eb38392228fe"
+    }
+  ]
+}
