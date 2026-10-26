@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Investment News</title>
+<meta name="description" content="Daily frontier AI news scored for investors.">
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --text: #16191f; --muted: #5f6877; --border: #e2e5ea;
+    --accent: #2f5bea; --accent-text: #ffffff;
+    --hi-bg: #dcf5e4; --hi-fg: #14663a;
+    --mid-bg: #fdf0cc; --mid-fg: #7a5200;
+    --lo-bg: #ebedf0; --lo-fg: #4b5260;
+    --err-bg: #fde3e1; --err-fg: #8a1f17;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101216; --surface: #181b21; --text: #eceef2; --muted: #9aa3b2; --border: #2a2f38;
+      --accent: #6b8cff; --accent-text: #0d1020;
+      --hi-bg: #17402a; --hi-fg: #86e0ab;
+      --mid-bg: #46380f; --mid-fg: #f2cf6b;
+      --lo-bg: #272b33; --lo-fg: #aab2c0;
+      --err-bg: #4a1f1c; --err-fg: #ffb4ad;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 1.6rem; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 0.9rem; margin-top: 2px; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); padding: 8px 14px; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding: 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--muted); flex: 1 1 140px; }
+  select { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); width: 100%; }
+  .notice { padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.92rem; background: var(--lo-bg); color: var(--lo-fg); }
+  .notice.error { background: var(--err-bg); color: var(--err-fg); }
+  h2 { font-size: 1.1rem; margin: 28px 0 10px; display: flex; align-items: baseline; gap: 8px; }
+  h2 .n { color: var(--muted); font-size: 0.85rem; font-weight: 400; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .card-top { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+  .card a { color: var(--text); font-weight: 600; text-decoration: none; font-size: 1.02rem; line-height: 1.35; }
+  .card a:hover, .card a:focus-visible { color: var(--accent); text-decoration: underline; }
+  .meta { color: var(--muted); font-size: 0.85rem; margin: 4px 0 8px; }
+  .summary { margin: 0; font-size: 0.95rem; }
+  .badge { flex: none; min-width: 2.4rem; text-align: center; font-weight: 700; font-size: 0.9rem; padding: 3px 9px; border-radius: 999px; }
+  .badge.hi { background: var(--hi-bg); color: var(--hi-fg); }
+  .badge.mid { background: var(--mid-bg); color: var(--mid-fg); }
+  .badge.lo { background: var(--lo-bg); color: var(--lo-fg); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  @media (max-width: 480px) { h1 { font-size: 1.35rem; } header button { width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>AI Investment News</h1>
+      <div class="sub" id="refreshed">Loading…</div>
+    </div>
+    <button class="primary" id="refresh" type="button">Refresh</button>
+  </header>
+
+  <div class="filters">
+    <label>Topic
+      <select id="f-topic">
+        <option value="">All topics</option>
+        <option value="frontier-ai">Frontier AI labs and models</option>
+        <option value="ai-infrastructure">AI infrastructure and supply chain</option>
+        <option value="ai-capital-markets">AI capital markets and deal flow</option>
+      </select>
+    </label>
+    <label>Minimum relevance
+      <select id="f-score">
+        <option value="1">1+ (all)</option>
+        <option value="5">5+</option>
+        <option value="7" selected>7+</option>
+        <option value="9">9+</option>
+      </select>
+    </label>
+    <label>Show
+      <select id="f-count">
+        <option value="10">10 articles</option>
+        <option value="20">20 articles</option>
+        <option value="50" selected>50 articles</option>
+        <option value="100">100 articles</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="notice" class="notice" hidden role="status"></div>
+  <main id="feed" aria-live="polite"></main>
+</div>
+
+<script>
+const API = "https://news-app-backend.annika-schwarz-co.workers.dev";
+const TOPICS = {
+  "frontier-ai": "Frontier AI labs and models",
+  "ai-infrastructure": "AI infrastructure and supply chain",
+  "ai-capital-markets": "AI capital markets and deal flow",
+};
+
+const $ = (id) => document.getElementById(id);
+const feed = $("feed"), notice = $("notice"), refreshBtn = $("refresh");
+
+function el(tag, props = {}, ...kids) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  for (const k of kids) node.append(k);
+  return node;
+}
+
+function showNotice(text, isError = false) {
+  notice.textContent = text;
+  notice.className = "notice" + (isError ? " error" : "");
+  notice.hidden = !text;
+}
+
+function badgeClass(score) {
+  return score >= 8 ? "hi" : score >= 6 ? "mid" : "lo";
+}
+
+function safeUrl(u) {
+  try { const p = new URL(u); return /^https?:$/.test(p.protocol) ? p.href : null; } catch { return null; }
+}
+
+function formatDate(d) {
+  if (!d) return "Date unknown";
+  const dt = new Date(d + "T12:00:00");
+  return isNaN(dt) ? d : dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatRefreshed(iso) {
+  if (!iso) return "No articles yet. Press Refresh.";
+  const dt = new Date(iso);
+  return "Last refreshed " + dt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function card(a) {
+  const href = safeUrl(a.url);
+  const title = href ? el("a", { href, target: "_blank", rel: "noopener noreferrer", textContent: a.headline }) : el("span", { textContent: a.headline });
+  return el("article", { className: "card" },
+    el("div", { className: "card-top" }, title,
+      el("span", { className: "badge " + badgeClass(a.relevance_score), title: "Relevance score", textContent: a.relevance_score ?? "–" })),
+    el("div", { className: "meta", textContent: `${a.source || "Unknown source"} · ${formatDate(a.publication_date)}` }),
+    el("p", { className: "summary", textContent: a.summary || "" }));
+}
+
+function render(articles) {
+  feed.replaceChildren();
+  if (!articles.length) {
+    feed.append(el("div", { className: "empty", textContent: "No articles match these filters." }));
+    return;
+  }
+  const groups = {};
+  for (const a of articles) (groups[a.topic] ||= []).push(a);
+  const order = [...Object.keys(TOPICS), ...Object.keys(groups).filter((k) => !(k in TOPICS))];
+  for (const key of order) {
+    if (!groups[key]) continue;
+    feed.append(el("h2", { textContent: TOPICS[key] || key }, el("span", { className: "n", textContent: groups[key].length })));
+    for (const a of groups[key]) feed.append(card(a));
+  }
+}
+
+async function load() {
+  const params = new URLSearchParams({ limit: $("f-count").value, min_score: $("f-score").value });
+  if ($("f-topic").value) params.set("topic", $("f-topic").value);
+  try {
+    const res = await fetch(`${API}/articles?${params}`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    $("refreshed").textContent = formatRefreshed(data.last_refreshed);
+    render(data.articles);
+  } catch (err) {
+    showNotice("Could not load articles: " + err.message, true);
+  }
+}
+
+async function refresh() {
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = "Refreshing… (about a minute)";
+  showNotice("Searching the web for new articles. This can take a minute or two.");
+  try {
+    const res = await fetch(`${API}/agent`);
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 429) {
+      showNotice(data.error || "Refreshed very recently. Try again in a few minutes.");
+    } else if (!res.ok) {
+      showNotice("Refresh failed: " + (data.error || res.status), true);
+    } else {
+      const failed = (data.topics || []).filter((t) => t.error).length;
+      showNotice(`Added ${data.inserted} new, skipped ${data.skipped} already stored.` +
+        (failed ? ` ${failed} topic(s) failed; try again later.` : ""), failed > 0);
+    }
+  } catch (err) {
+    showNotice("Refresh failed: " + err.message, true);
+  } finally {
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = "Refresh";
+    await load();
+  }
+}
+
+refreshBtn.addEventListener("click", refresh);
+for (const id of ["f-topic", "f-score", "f-count"]) $(id).addEventListener("change", load);
+load();
+</script>
+</body>
+</html>
