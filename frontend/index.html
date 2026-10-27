@@ -27,7 +27,7 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
     font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
   header { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
   h1 { font-size: 1.6rem; margin: 0; letter-spacing: -0.01em; }
   .sub { color: var(--muted); font-size: 0.9rem; margin-top: 2px; }
@@ -56,10 +56,59 @@
   .badge.lo { background: var(--lo-bg); color: var(--lo-fg); }
   .empty { color: var(--muted); text-align: center; padding: 40px 0; }
   @media (max-width: 480px) { h1 { font-size: 1.35rem; } header button { width: 100%; } }
+
+  /* Layout: news column + chat panel */
+  .layout { display: block; }
+  .chat { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; min-height: 0; }
+  .chat-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .chat-head h2 { margin: 0; font-size: 1.05rem; flex: 1; display: block; }
+  .chat-head select { width: auto; padding: 6px 8px; font-size: 0.85rem; }
+  .chat-close { padding: 4px 10px; font-size: 1.1rem; line-height: 1.2; }
+  .chat-log { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .msg { max-width: 92%; padding: 9px 12px; border-radius: 12px; font-size: 0.92rem; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-text); border-bottom-right-radius: 4px; white-space: pre-wrap; }
+  .msg.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; max-width: 100%; }
+  .msg.bot.error { background: var(--err-bg); color: var(--err-fg); border-color: transparent; }
+  .msg.bot p { margin: 0 0 8px; } .msg.bot p:last-child { margin-bottom: 0; }
+  .msg.bot ul { margin: 0 0 8px; padding-left: 20px; }
+  .msg.bot a.cite { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.8em; vertical-align: super; }
+  .warn { margin-top: 8px; padding: 6px 10px; border-radius: 8px; background: var(--mid-bg); color: var(--mid-fg); font-size: 0.82rem; }
+  .sources { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.82rem; }
+  .sources b { color: var(--muted); font-weight: 600; }
+  .sources ol { margin: 4px 0 0; padding-left: 20px; }
+  .sources a { color: var(--text); }
+  .usage { margin-top: 8px; color: var(--muted); font-size: 0.75rem; }
+  .thinking { color: var(--muted); font-style: italic; }
+  .hint { color: var(--muted); font-size: 0.88rem; }
+  .chips { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .chips button { text-align: left; font-size: 0.86rem; padding: 7px 10px; }
+  .chat-form { border-top: 1px solid var(--border); padding: 10px 12px 12px; }
+  .chat-row { display: flex; gap: 8px; align-items: flex-end; }
+  .chat-row textarea { flex: 1; font: inherit; font-size: 0.95rem; padding: 8px 10px; resize: none; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .chat-note { color: var(--muted); font-size: 0.74rem; margin-top: 6px; display: flex; justify-content: space-between; }
+  .fab { display: none; }
+  @media (min-width: 900px) {
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 24px; align-items: start; }
+    .chat { position: sticky; top: 16px; height: calc(100vh - 32px); }
+    .chat-close { display: none; }
+  }
+  @media (max-width: 899px) {
+    .chat { display: none; position: fixed; inset: 0; z-index: 20; height: 100dvh; border: 0; border-radius: 0; }
+    body.chat-open .chat { display: flex; }
+    body.chat-open { overflow: hidden; }
+    .fab { display: flex; align-items: center; gap: 8px; position: fixed; right: 16px; bottom: 16px; z-index: 10;
+      padding: 12px 18px; border-radius: 999px; background: var(--accent); color: var(--accent-text);
+      border-color: var(--accent); font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+    body.chat-open .fab { display: none; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
+<div class="layout">
+<div class="news-col">
   <header>
     <div>
       <h1>AI Investment News</h1>
@@ -99,6 +148,29 @@
   <div id="notice" class="notice" hidden role="status"></div>
   <main id="feed" aria-live="polite"></main>
 </div>
+
+<aside class="chat" id="chat" aria-label="Ask about the news">
+  <div class="chat-head">
+    <h2>Ask about the news</h2>
+    <label class="sr" for="chat-model" style="position:absolute;left:-9999px">Model</label>
+    <select id="chat-model" title="Model">
+      <option value="haiku">Fast · Haiku</option>
+      <option value="sonnet">Capable · Sonnet</option>
+    </select>
+    <button class="chat-close" id="chat-close" type="button" aria-label="Close chat">&times;</button>
+  </div>
+  <div class="chat-log" id="chat-log" aria-live="polite"></div>
+  <form class="chat-form" id="chat-form">
+    <div class="chat-row">
+      <textarea id="chat-input" rows="2" maxlength="500" placeholder="Ask about the articles…" aria-label="Your question"></textarea>
+      <button class="primary" id="chat-send" type="submit">Send</button>
+    </div>
+    <div class="chat-note"><span>Answers use the latest stored articles. Each question is separate.</span><span id="chat-count">0/500</span></div>
+  </form>
+</aside>
+</div>
+</div>
+<button class="fab" id="chat-fab" type="button" aria-controls="chat">💬 Ask about the news</button>
 
 <script>
 const API = "https://news-app-backend.annika-schwarz-co.workers.dev";
@@ -213,6 +285,137 @@ async function refresh() {
 refreshBtn.addEventListener("click", refresh);
 for (const id of ["f-topic", "f-score", "f-count"]) $(id).addEventListener("change", load);
 load();
+
+// ---------- Chat ----------
+const chatLog = $("chat-log"), chatForm = $("chat-form"), chatInput = $("chat-input"), chatSend = $("chat-send");
+const MODEL_LABEL = { haiku: "Haiku", sonnet: "Sonnet" };
+const EXAMPLES = [
+  "What are the biggest AI funding deals this week?",
+  "What happened with Nvidia and AI chips recently?",
+  "Which news could move AI lab valuations?",
+];
+
+// Renders **bold**, and [n] citations as links to the matching source.
+function inline(parent, text, sources) {
+  const re = /\*\*(.+?)\*\*|\[(\d{1,2})\]/g;
+  let last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) parent.append(text.slice(last, m.index));
+    if (m[1] !== undefined) {
+      parent.append(el("strong", { textContent: m[1] }));
+    } else {
+      const src = sources.find((x) => x.n === Number(m[2]));
+      const href = src && safeUrl(src.url);
+      parent.append(href
+        ? el("a", { className: "cite", href, target: "_blank", rel: "noopener noreferrer", title: src.headline, textContent: `[${m[2]}]` })
+        : `[${m[2]}]`);
+    }
+    last = re.lastIndex;
+  }
+  if (last < text.length) parent.append(text.slice(last));
+}
+
+function renderAnswer(text, sources) {
+  const box = el("div");
+  let list = null;
+  for (const line of text.split("\n")) {
+    const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
+    if (bullet) {
+      if (!list) { list = el("ul"); box.append(list); }
+      const li = el("li"); inline(li, bullet[1], sources); list.append(li);
+    } else if (line.trim()) {
+      list = null;
+      const p = el("p"); inline(p, line.trim(), sources); box.append(p);
+    }
+  }
+  return box;
+}
+
+function addMsg(kind, ...kids) {
+  const m = el("div", { className: "msg " + kind }, ...kids);
+  chatLog.append(m);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return m;
+}
+
+function showIntro() {
+  const chips = el("div", { className: "chips" });
+  for (const q of EXAMPLES) {
+    chips.append(el("button", { type: "button", textContent: q, onclick: () => { chatInput.value = q; updateCount(); sendChat(); } }));
+  }
+  chatLog.append(el("div", { className: "hint" },
+    "Ask a question and I'll answer from the most relevant recent articles, with sources. Try:", chips));
+}
+
+function updateCount() { $("chat-count").textContent = `${chatInput.value.length}/500`; }
+
+async function sendChat() {
+  const question = chatInput.value.trim();
+  if (!question || chatSend.disabled) return;
+  const model = $("chat-model").value;
+  chatLog.querySelector(".hint")?.remove();
+  addMsg("user", question);
+  chatInput.value = ""; updateCount();
+  chatSend.disabled = true; chatSend.textContent = "…";
+  const pending = addMsg("bot", el("span", { className: "thinking", textContent: "Reading the articles…" }));
+  try {
+    const res = await fetch(`${API}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, model }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.answer) {
+      const friendly = res.status === 429
+        ? (data.error || "That model is busy right now. Try the other model or wait a moment.")
+        : res.status === 409
+          ? "There are no articles to answer from yet. Press Refresh first."
+          : (data.error || "Something went wrong. Please try again.");
+      pending.className = "msg bot error";
+      pending.replaceChildren(friendly);
+      return;
+    }
+    const sources = data.sources || [];
+    pending.replaceChildren(renderAnswer(data.answer, sources));
+    if (data.truncated) {
+      pending.append(el("div", { className: "warn", textContent: "This answer was cut short by the length limit. Try a narrower question for the full picture." }));
+    }
+    if (sources.length) {
+      const ol = el("ol");
+      for (const x of sources) {
+        const href = safeUrl(x.url);
+        ol.append(el("li", {}, href ? el("a", { href, target: "_blank", rel: "noopener noreferrer", textContent: x.headline }) : x.headline,
+          x.source ? el("span", { className: "hint", textContent: ` · ${x.source}` }) : ""));
+      }
+      pending.append(el("div", { className: "sources" }, el("b", { textContent: `Sources (${data.articles_used} articles used)` }), ol));
+    }
+    const u = data.usage || {};
+    pending.append(el("div", { className: "usage",
+      textContent: `${MODEL_LABEL[model] || model} · ${(u.input_tokens ?? 0).toLocaleString()} tokens in · ${(u.output_tokens ?? 0).toLocaleString()} tokens out · ${data.articles_used} articles used` }));
+  } catch (err) {
+    pending.className = "msg bot error";
+    pending.replaceChildren("Couldn't reach the server. Check your connection and try again.");
+  } finally {
+    chatSend.disabled = false; chatSend.textContent = "Send";
+    chatLog.scrollTop = chatLog.scrollHeight;
+    if (window.matchMedia("(min-width: 900px)").matches) chatInput.focus();
+  }
+}
+
+function setChatOpen(open) {
+  document.body.classList.toggle("chat-open", open);
+  if (open) chatInput.focus();
+}
+
+chatForm.addEventListener("submit", (e) => { e.preventDefault(); sendChat(); });
+chatInput.addEventListener("input", updateCount);
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+$("chat-fab").addEventListener("click", () => setChatOpen(true));
+$("chat-close").addEventListener("click", () => setChatOpen(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") setChatOpen(false); });
+showIntro();
 </script>
 </body>
 </html>
