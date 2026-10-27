@@ -5,9 +5,11 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "db:schema": "wrangler d1 execute news-db --remote --file=schema.sql"
+    "db:schema": "wrangler d1 execute news-db --remote --file=schema.sql",
+    "test": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "wrangler": "^4.153.0"
   },
   "dependencies": {
