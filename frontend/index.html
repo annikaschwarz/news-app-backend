@@ -103,6 +103,26 @@
       border-color: var(--accent); font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
     body.chat-open .fab { display: none; }
   }
+
+  /* Under the Hood */
+  .hood { border-top: 1px solid var(--border); background: var(--bg); font-size: 0.85rem; }
+  .hood > summary { cursor: pointer; padding: 9px 14px; font-weight: 600; color: var(--muted); list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  .hood > summary::-webkit-details-marker { display: none; }
+  .hood > summary::after { content: "▸"; transition: transform .15s; }
+  .hood[open] > summary::after { transform: rotate(90deg); }
+  .hood-body { padding: 0 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .switch { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  .switch input { margin-top: 3px; width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
+  .switch small { display: block; color: var(--muted); font-size: 0.78rem; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0; }
+  .stats div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; }
+  .stats dt { color: var(--muted); font-size: 0.72rem; }
+  .stats dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stats-title { color: var(--muted); font-size: 0.75rem; margin: 0; }
+  .web-badge { display: inline-block; margin-top: 8px; padding: 2px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .web-badge.on { background: var(--hi-bg); color: var(--hi-fg); }
+  .web-badge.off { background: var(--lo-bg); color: var(--lo-fg); }
+  .sources.web { margin-top: 6px; border-top: 0; padding-top: 0; }
 </style>
 </head>
 <body>
@@ -160,6 +180,23 @@
     <button class="chat-close" id="chat-close" type="button" aria-label="Close chat">&times;</button>
   </div>
   <div class="chat-log" id="chat-log" aria-live="polite"></div>
+  <details class="hood" id="hood">
+    <summary>Under the Hood</summary>
+    <div class="hood-body">
+      <label class="switch">
+        <input type="checkbox" id="web-toggle">
+        <span>Web search<small>Let Claude search the web (up to 2 searches) for anything not in the article database. Uses more tokens.</small></span>
+      </label>
+      <p class="stats-title" id="hood-title">Last response</p>
+      <dl class="stats">
+        <div><dt>Articles from database</dt><dd id="st-articles">–</dd></div>
+        <div><dt>Context tokens (est.)</dt><dd id="st-context">–</dd></div>
+        <div><dt>Input tokens (total)</dt><dd id="st-in">–</dd></div>
+        <div><dt>Output tokens</dt><dd id="st-out">–</dd></div>
+        <div style="grid-column: 1 / -1"><dt>Web search</dt><dd id="st-web">–</dd></div>
+      </dl>
+    </div>
+  </details>
   <form class="chat-form" id="chat-form">
     <div class="chat-row">
       <textarea id="chat-input" rows="2" maxlength="500" placeholder="Ask about the articles…" aria-label="Your question"></textarea>
@@ -288,6 +325,7 @@ load();
 
 // ---------- Chat ----------
 const chatLog = $("chat-log"), chatForm = $("chat-form"), chatInput = $("chat-input"), chatSend = $("chat-send");
+const webToggle = $("web-toggle");
 const MODEL_LABEL = { haiku: "Haiku", sonnet: "Sonnet" };
 const EXAMPLES = [
   "What are the biggest AI funding deals this week?",
@@ -362,7 +400,7 @@ async function sendChat() {
     const res = await fetch(`${API}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, model }),
+      body: JSON.stringify({ question, model, web_search: webToggle.checked }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.answer) {
@@ -390,8 +428,27 @@ async function sendChat() {
       pending.append(el("div", { className: "sources" }, el("b", { textContent: `Sources (${data.articles_used} articles used)` }), ol));
     }
     const u = data.usage || {};
+    const ws = data.web_search || {};
+    pending.append(el("div", { className: "web-badge " + (ws.used ? "on" : "off"),
+      textContent: ws.used ? `🌐 Web search used (${ws.searches} ${ws.searches === 1 ? "search" : "searches"})`
+        : ws.enabled ? "Web search on, not needed: answered from the database" : "Database only" }));
+    if (ws.used && (ws.sources || []).length) {
+      const ul = el("ul");
+      for (const x of ws.sources) {
+        const href = safeUrl(x.url);
+        if (href) ul.append(el("li", {}, el("a", { href, target: "_blank", rel: "noopener noreferrer", textContent: x.title || href })));
+      }
+      if (ul.children.length) pending.append(el("div", { className: "sources web" }, el("b", { textContent: "Web sources" }), ul));
+    }
+    const fmt = (n) => (n ?? 0).toLocaleString();
     pending.append(el("div", { className: "usage",
-      textContent: `${MODEL_LABEL[model] || model} · ${(u.input_tokens ?? 0).toLocaleString()} tokens in · ${(u.output_tokens ?? 0).toLocaleString()} tokens out · ${data.articles_used} articles used` }));
+      textContent: `${MODEL_LABEL[model] || model} · ${fmt(u.input_tokens)} tokens in · ${fmt(u.output_tokens)} tokens out · ${data.articles_used} articles (~${fmt(data.context_tokens_estimate)} context tokens)` }));
+    $("hood-title").textContent = "Last response";
+    $("st-articles").textContent = data.articles_used;
+    $("st-context").textContent = "~" + fmt(data.context_tokens_estimate);
+    $("st-in").textContent = fmt(u.input_tokens);
+    $("st-out").textContent = fmt(u.output_tokens);
+    $("st-web").textContent = ws.used ? `Used (${ws.searches} of max ${ws.max_searches})` : ws.enabled ? "On, not needed" : "Off";
   } catch (err) {
     pending.className = "msg bot error";
     pending.replaceChildren("Couldn't reach the server. Check your connection and try again.");
@@ -415,6 +472,8 @@ chatInput.addEventListener("keydown", (e) => {
 $("chat-fab").addEventListener("click", () => setChatOpen(true));
 $("chat-close").addEventListener("click", () => setChatOpen(false));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") setChatOpen(false); });
+try { webToggle.checked = localStorage.getItem("webSearch") === "1"; } catch {}
+webToggle.addEventListener("change", () => { try { localStorage.setItem("webSearch", webToggle.checked ? "1" : "0"); } catch {} });
 showIntro();
 </script>
 </body>
