@@ -320,11 +320,11 @@ async function pickContextArticles(env, question) {
 const CHAT_FORMAT = `Write in plain, direct language: no hype, no filler, no preamble.
 Structure every answer as three short paragraphs, each starting with a bold label:
 **Takeaway:** one sentence.
-**Why it matters:** the implications for valuations, capital flows or competitive position.
-**What to watch:** the next concrete events or data points that would confirm or change the picture.
+**Why it matters:** the implications for valuations, capital flows or competitive position, in at most three sentences.
+**What to watch:** the next concrete events or data points that would confirm or change the picture, in at most two sentences.
 Keep facts and inference apart: state what the sources report, and begin your own interpretation with "My read:". Flag when the evidence is thin, one-sided, self-reported or rests on a single source.
 Do not give personalized investment advice and never tell the reader to buy, sell or hold anything.
-Stay under 180 words in total.`;
+Hard limit: 180 words in total, so drop minor details rather than run over.`;
 
 const CHAT_SYSTEM = `You are a sharp, skeptical buy-side AI analyst briefing an investment professional who follows frontier AI.
 Use only the numbered articles inside <articles> as your source of facts, and cite them like [1] or [2][4].
