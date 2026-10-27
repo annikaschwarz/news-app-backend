@@ -1,9 +1,11 @@
 // News Intelligence App — API / agent Worker.
-//   GET /health    status + timestamp
+//   GET /health    status + timestamp (public)
 //   GET /agent     fetch fresh articles for every topic (also runs on the daily cron);
 //                  requires "Authorization: Bearer <PIPELINE_SECRET>"
 //   POST /chat     answer a question using recent stored articles as context
 //   GET /articles  query stored articles (topic, from, to, source, min_score, limit)
+// /chat and /articles need the "X-Internal-Key: <INTERNAL_API_KEY>" header; only the Pages
+// Functions (behind the site login) hold it.
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -206,16 +208,24 @@ async function runAgent(env) {
   };
 }
 
-// Constant-time comparison of the bearer token against PIPELINE_SECRET.
+// Constant-time string comparison: hash both sides to equal length, then timingSafeEqual.
+async function safeEqual(a, b) {
+  const enc = new TextEncoder();
+  const [x, y] = await Promise.all([a, b].map((v) => crypto.subtle.digest("SHA-256", enc.encode(v))));
+  return crypto.subtle.timingSafeEqual(x, y);
+}
+
+// Bearer token against PIPELINE_SECRET.
 async function isAuthorized(request, env) {
   if (!env.PIPELINE_SECRET) return false;
   const match = /^Bearer\s+(.+)$/i.exec(request.headers.get("Authorization") ?? "");
-  if (!match) return false;
-  const enc = new TextEncoder();
-  const [a, b] = await Promise.all(
-    [match[1].trim(), env.PIPELINE_SECRET].map((v) => crypto.subtle.digest("SHA-256", enc.encode(v))),
-  );
-  return crypto.subtle.timingSafeEqual(a, b);
+  return match ? safeEqual(match[1].trim(), env.PIPELINE_SECRET) : false;
+}
+
+// X-Internal-Key header against INTERNAL_API_KEY (fails closed if the secret is missing).
+async function hasInternalKey(request, env) {
+  const key = request.headers.get("X-Internal-Key");
+  return Boolean(env.INTERNAL_API_KEY && key && (await safeEqual(key, env.INTERNAL_API_KEY)));
 }
 
 async function handleAgent(request, env) {
@@ -451,6 +461,9 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
     const url = new URL(request.url);
+    if ((url.pathname === "/chat" || url.pathname === "/articles") && !(await hasInternalKey(request, env))) {
+      return json({ error: "Unauthorized" }, 401);
+    }
     try {
       switch (url.pathname) {
         case "/health":

@@ -11,3 +11,4 @@ blob-report/
 playwright/.cache/
 .playwright/
 downloads/
+tests/.auth/

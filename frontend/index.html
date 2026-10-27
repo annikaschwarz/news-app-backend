@@ -35,6 +35,9 @@
     background: var(--surface); color: var(--text); padding: 8px 14px; }
   button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
   button:disabled { opacity: 0.6; cursor: progress; }
+  .actions { display: flex; align-items: center; gap: 14px; }
+  .logout { color: var(--muted); font-size: 0.9rem; }
+  .logout:hover { color: var(--text); }
   .filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding: 12px;
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
   .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--muted); flex: 1 1 140px; }
@@ -55,7 +58,7 @@
   .badge.mid { background: var(--mid-bg); color: var(--mid-fg); }
   .badge.lo { background: var(--lo-bg); color: var(--lo-fg); }
   .empty { color: var(--muted); text-align: center; padding: 40px 0; }
-  @media (max-width: 480px) { h1 { font-size: 1.35rem; } header button { width: 100%; } }
+  @media (max-width: 480px) { h1 { font-size: 1.35rem; } .actions { width: 100%; } header button { flex: 1; } }
 
   /* Layout: news column + chat panel */
   .layout { display: block; }
@@ -135,7 +138,10 @@
       <div class="sub">Frontier AI, infrastructure and deal flow, scored for investors</div>
       <div class="sub" id="refreshed">Loading…</div>
     </div>
-    <button class="primary" id="refresh" type="button">Refresh</button>
+    <div class="actions">
+      <button class="primary" id="refresh" type="button">Refresh</button>
+      <a class="logout" href="/logout">Log out</a>
+    </div>
   </header>
 
   <div class="filters">
@@ -210,7 +216,6 @@
 <button class="fab" id="chat-fab" type="button" aria-controls="chat">💬 Ask about the news</button>
 
 <script>
-const API = "https://news-app-backend.annika-schwarz-co.workers.dev";
 const TOPICS = {
   "frontier-ai": "Frontier AI labs and models",
   "ai-infrastructure": "AI infrastructure and supply chain",
@@ -225,6 +230,12 @@ function el(tag, props = {}, ...kids) {
   Object.assign(node, props);
   for (const k of kids) node.append(k);
   return node;
+}
+
+// The middleware answers 401 {"error":"Not signed in"} when the session has expired.
+function signedOut(res, data) {
+  if (res.status === 401 && data && data.error === "Not signed in") { location.href = "/login"; return true; }
+  return false;
 }
 
 function showNotice(text, isError = false) {
@@ -283,9 +294,10 @@ async function load() {
   const params = new URLSearchParams({ limit: $("f-count").value, min_score: $("f-score").value });
   if ($("f-topic").value) params.set("topic", $("f-topic").value);
   try {
-    const res = await fetch(`${API}/articles?${params}`);
+    const res = await fetch(`/api/articles?${params}`);
+    const data = await res.json().catch(() => ({}));
+    if (signedOut(res, data)) return;
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
-    const data = await res.json();
     $("refreshed").textContent = formatRefreshed(data.last_refreshed);
     render(data.articles);
   } catch (err) {
@@ -301,6 +313,7 @@ async function refresh() {
     // Same-origin Pages Function adds the pipeline secret server-side (functions/api/refresh.js).
     const res = await fetch("/api/refresh", { method: "POST" });
     const data = await res.json().catch(() => ({}));
+    if (signedOut(res, data)) return;
     if (res.status === 429) {
       showNotice(data.error || "Refreshed very recently. Try again in a few minutes.");
     } else if (!res.ok) {
@@ -397,12 +410,13 @@ async function sendChat() {
   chatSend.disabled = true; chatSend.textContent = "…";
   const pending = addMsg("bot", el("span", { className: "thinking", textContent: "Reading the articles…" }));
   try {
-    const res = await fetch(`${API}/chat`, {
+    const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question, model, web_search: webToggle.checked }),
     });
     const data = await res.json().catch(() => ({}));
+    if (signedOut(res, data)) return;
     if (!res.ok || !data.answer) {
       const friendly = res.status === 429
         ? (data.error || "That model is busy right now. Try the other model or wait a moment.")

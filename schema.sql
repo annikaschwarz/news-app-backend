@@ -15,3 +15,10 @@ CREATE INDEX IF NOT EXISTS idx_articles_topic      ON articles (topic);
 CREATE INDEX IF NOT EXISTS idx_articles_pub_date   ON articles (publication_date);
 CREATE INDEX IF NOT EXISTS idx_articles_relevance  ON articles (relevance_score);
 CREATE INDEX IF NOT EXISTS idx_articles_fetched_at ON articles (fetched_at);
+
+-- Failed-login tracking for the Pages /login function (one row per client IP).
+CREATE TABLE IF NOT EXISTS login_attempts (
+  ip           TEXT PRIMARY KEY,
+  fails        INTEGER NOT NULL,
+  window_start INTEGER NOT NULL
+);
