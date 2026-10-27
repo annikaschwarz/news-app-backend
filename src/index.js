@@ -1,6 +1,7 @@
 // News Intelligence App — API / agent Worker.
 //   GET /health    status + timestamp
-//   GET /agent     fetch fresh articles for every topic (also runs on the daily cron)
+//   GET /agent     fetch fresh articles for every topic (also runs on the daily cron);
+//                  requires "Authorization: Bearer <PIPELINE_SECRET>"
 //   GET /articles  query stored articles (topic, from, to, source, min_score, limit)
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -36,7 +37,7 @@ const TOPICS = [
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 function json(data, status = 200) {
@@ -187,7 +188,25 @@ async function runAgent(env) {
   };
 }
 
-async function handleAgent(env) {
+// Constant-time comparison of the bearer token against PIPELINE_SECRET.
+async function isAuthorized(request, env) {
+  if (!env.PIPELINE_SECRET) return false;
+  const match = /^Bearer\s+(.+)$/i.exec(request.headers.get("Authorization") ?? "");
+  if (!match) return false;
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all(
+    [match[1].trim(), env.PIPELINE_SECRET].map((v) => crypto.subtle.digest("SHA-256", enc.encode(v))),
+  );
+  return crypto.subtle.timingSafeEqual(a, b);
+}
+
+async function handleAgent(request, env) {
+  if (!(await isAuthorized(request, env))) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", "WWW-Authenticate": "Bearer", ...CORS_HEADERS },
+    });
+  }
   const last = await env.DB.prepare("SELECT MAX(fetched_at) AS last FROM articles").first();
   if (last?.last) {
     const minutesAgo = (Date.now() - Date.parse(last.last)) / 60000;
@@ -256,7 +275,7 @@ export default {
         case "/health":
           return json({ status: "ok", timestamp: new Date().toISOString() });
         case "/agent":
-          return await handleAgent(env);
+          return await handleAgent(request, env);
         case "/articles":
           return await handleArticles(url, env);
         default:

@@ -189,7 +189,8 @@ async function refresh() {
   refreshBtn.textContent = "Refreshing… (about a minute)";
   showNotice("Searching the web for new articles. This can take a minute or two.");
   try {
-    const res = await fetch(`${API}/agent`);
+    // Same-origin Pages Function adds the pipeline secret server-side (functions/api/refresh.js).
+    const res = await fetch("/api/refresh", { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (res.status === 429) {
       showNotice(data.error || "Refreshed very recently. Try again in a few minutes.");
